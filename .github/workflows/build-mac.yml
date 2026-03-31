@@ -30,3 +30,92 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: out/make/**/*.zip
+          name: Build Mac
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-mac:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15-intel
+            arch: x64
+            zip_name: BatteryDrama-Mac-Intel-v1.zip
+            artifact_name: BatteryDrama-Mac-Intel-v1
+
+          - runner: macos-latest
+            arch: arm64
+            zip_name: BatteryDrama-Mac-AppleSilicon-v1.zip
+            artifact_name: BatteryDrama-Mac-AppleSilicon-v1
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Debug - verify systeminformation is installed
+        shell: bash
+        run: |
+          echo "Checking installed dependency..."
+          npm ls systeminformation
+          echo "Listing package folder..."
+          ls -la node_modules/systeminformation
+
+      - name: Build Mac distributable
+        run: npm run make -- --platform=darwin --arch=${{ matrix.arch }}
+
+      - name: Debug - inspect packaged app.asar
+        shell: bash
+        run: |
+          ASAR_PATH=$(find out -name app.asar | head -n 1)
+          echo "Found ASAR at: $ASAR_PATH"
+
+          if [ -z "$ASAR_PATH" ]; then
+            echo "No app.asar found"
+            exit 1
+          fi
+
+          echo "Searching app.asar for systeminformation..."
+          npx asar list "$ASAR_PATH" | grep systeminformation || true
+
+      - name: Show generated files
+        run: find out -type f
+
+      - name: Rename build to customer-facing filename
+        shell: bash
+        run: |
+          mkdir -p dist
+
+          FOUND_ZIP=$(find out/make -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$FOUND_ZIP" ]; then
+            echo "No .zip file found in out/make"
+            exit 1
+          fi
+
+          cp "$FOUND_ZIP" "dist/${{ matrix.zip_name }}"
+
+          echo "Created:"
+          ls -lh dist
+
+      - name: Upload Mac build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.zip_name }}
