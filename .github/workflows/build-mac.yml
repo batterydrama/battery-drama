@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-15-intel
 
     steps:
       - name: Check out code
@@ -19,11 +19,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Mac distributable
-        run: npm run make
+      - name: Build Mac x64 distributable
+        run: npm run make -- --platform=darwin --arch=x64
 
       - name: Upload Mac build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: battery-drama-mac
+          name: battery-drama-mac-x64
           path: out/make/**/*.zip
